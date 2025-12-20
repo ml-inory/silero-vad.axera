@@ -1,22 +1,14 @@
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--backend", type=str, default="AX")
+parser.add_argument("--backend", type=str, default="ax650", choices=['ax650', 'ax630c', 'onnx'])
 args = parser.parse_args()
 
-
-if args.backend == "AX":
-    MODEL_PATH = "./silero_vad_ax650.axmodel"
-    from SileroAx import SileroAx as Silero
-else:
-    MODEL_PATH = "./silero_vad.onnx"
-    from SileroOrt import SileroOrt as Silero
-
-from utils_vad import *
+from silero_vad_axera import *
 from pprint import pprint
 
 SAMPLING_RATE = 16000
-model = Silero(MODEL_PATH)
+model = load_silero_vad(args.backend)
 wav_path = "en.wav"
 
 """ Speech timestamps from full audio """

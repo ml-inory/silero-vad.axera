@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[options]
+include_package_data = true
+
+[tool.setuptools.package-data]
+"silero_vad_axera/data" = ["*"]
+
+[project]
+name = "silero-vad-axera"
+version = "0.1.1"
+authors = [
+  {name="Axera Team", email="hello@axera-tech.com"},
+]
+description = "Voice Activity Detector (VAD) by Silero"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "packaging",
+  "numpy<2.0",
+  "librosa==0.9.1",
+  "soundfile",
+  "onnxruntime>=1.16.1"
+]
+
+[project.urls]
+Homepage = "https://github.com/ml-inory/silero-vad.axera"
+Issues = "https://github.com/ml-inory/silero-vad.axera/issues"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "soundfile"
+]
