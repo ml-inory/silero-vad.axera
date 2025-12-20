@@ -1,6 +1,12 @@
-BACKEND = "AX"
-if BACKEND == "AX":
-    MODEL_PATH = "./silero_vad.axmodel"
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--backend", type=str, default="AX")
+args = parser.parse_args()
+
+
+if args.backend == "AX":
+    MODEL_PATH = "./silero_vad_ax650.axmodel"
     from SileroAx import SileroAx as Silero
 else:
     MODEL_PATH = "./silero_vad.onnx"

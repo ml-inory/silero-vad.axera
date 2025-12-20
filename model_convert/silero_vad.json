@@ -20,9 +20,13 @@
         {
             "start_tensor_names": ["DEFAULT"], 
             "end_tensor_names": ["DEFAULT"], 
-            "data_type": "U16"
+            "data_type": "FP32"
         } 
-      ]
+      ],
+      "enable_smooth_quant": true,
+      "disable_auto_refine_scale": true,
+      "precision_analysis": true,
+      "precision_analysis_method": "EndToEnd",
     },
     "input_processors": [
       {

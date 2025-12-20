@@ -37,6 +37,7 @@ class SileroOrt:
 
         if len(output.shape) == 0:
             output = np.array([output], dtype=np.float32)
+
         return output
     
     def audio_forward(self, x, sr):
@@ -54,7 +55,6 @@ class SileroOrt:
         for i in range(0, x.shape[0], num_samples):
             wavs_batch = x[i:i+num_samples]
             out_chunk = self.__call__(wavs_batch)
-            # print(out_chunk)
             outs.append(out_chunk)
 
         stacked = np.concatenate(outs, axis=-1)

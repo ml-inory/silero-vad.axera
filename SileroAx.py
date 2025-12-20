@@ -3,7 +3,7 @@ import axengine as axe
 
 
 class SileroAx:
-    def __init__(self, path: str):
+    def __init__(self, path: str, providers=['AxEngineExecutionProvider']):
         super().__init__()
 
         self.batch_size = 1
@@ -14,7 +14,7 @@ class SileroAx:
         self.state = np.zeros((2, self.batch_size, self.hidden_size), dtype=np.float32)
         self.num_samples = 512 if self.sr == 16000 else 256
 
-        self.model = axe.InferenceSession(path)
+        self.model = axe.InferenceSession(path, providers=providers)
 
     def reset_states(self):
         self.context = np.zeros((self.batch_size, self.context_size), dtype=np.float32)
@@ -31,12 +31,12 @@ class SileroAx:
             "state": self.state
         }
 
-        outputs = self.model.run(input_feed=input_feed)
-        output, self.state = outputs["output"], outputs["next_state"]
+        output, self.state = self.model.run(None, input_feed=input_feed)
         self.context = x[..., -self.context_size:]
 
         if len(output.shape) == 0:
             output = np.array([output], dtype=np.float32)
+
         return output
     
     def audio_forward(self, x, sr):
@@ -54,7 +54,6 @@ class SileroAx:
         for i in range(0, x.shape[0], num_samples):
             wavs_batch = x[i:i+num_samples]
             out_chunk = self.__call__(wavs_batch)
-            # print(out_chunk)
             outs.append(out_chunk)
 
         stacked = np.concatenate(outs, axis=-1)
