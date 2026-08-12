@@ -1,6 +1,7 @@
+import os
 import sys
-sys.path.append("..")
-from utils_vad import *
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+from silero_vad_axera.utils_vad import read_audio
 import os
 import onnxruntime as ort
 import numpy as np
@@ -25,12 +26,17 @@ tars = {}
 for name in input_names:
     os.makedirs(f"{calib_path}/{name}", exist_ok=True)
     
-ort_model = ort.InferenceSession("../silero_vad.onnx", providers=["CPUExecutionProvider"])
+ort_model = ort.InferenceSession(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "silero_vad.onnx"),
+    providers=["CPUExecutionProvider"],
+)
 
-with open('wavlist.txt', 'r') as f:
+repo_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wavlist.txt'), 'r') as f:
     for line in tqdm(f):
         line = line.strip()
-        wav = read_audio(line)
+        wav_path = line if os.path.isabs(line) else os.path.join(repo_root, line)
+        wav = read_audio(wav_path)
         wav_name = os.path.splitext(os.path.basename(line))[0]
         
 

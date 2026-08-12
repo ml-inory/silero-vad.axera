@@ -1,5 +1,10 @@
-librosa
+torch>=2.1
+onnx>=1.14
+onnxsim
+onnxscript
+librosa==0.9.1
 soundfile
 numpy<2.0
 tqdm
-onnxruntime
+onnxruntime>=1.16.1
+setuptools<81

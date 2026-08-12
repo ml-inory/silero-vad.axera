@@ -179,7 +179,9 @@ class SileroVADModelforExport(nn.Module):
 
     def forward(self, x, state):
         x, next_state = self._model(x, state)
-        return torch.mean(x.squeeze(-1), (0,1), keepdim=True), next_state
+        # 输出已经是 (1,1) 的单元素 sigmoid；去掉冗余的 ReduceMean，
+        # 否则 AX620E(NPU2) 后端无法编译该算子（数学上完全等价）。
+        return x.squeeze(-1), next_state
 
     def reset_states(self, batch_size=1):
         self._model.reset_states(batch_size)

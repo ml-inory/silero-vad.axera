@@ -40,7 +40,8 @@ dependencies = [
   "numpy<2.0",
   "librosa==0.9.1",
   "soundfile",
-  "onnxruntime>=1.16.1"
+  "onnxruntime>=1.16.1",
+  "setuptools<81"
 ]
 
 [project.urls]

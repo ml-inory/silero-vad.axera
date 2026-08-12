@@ -2,3 +2,11 @@ __pycache__
 calibration_dataset
 axmodel
 *.log
+dist/
+build/
+*.egg-info/
+model_convert/work_*/
+model_convert/*_pulsar2_config.json
+
+/model_convert/silero_vad.onnx
+model_convert/*.onnx.data
