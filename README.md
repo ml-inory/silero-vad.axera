@@ -1,34 +1,90 @@
 # silero-vad.axera
+
 Silero VAD implementation on Axera platforms
 
 Thanks to https://github.com/lovemefan/Silero-vad-pytorch/tree/main, a reverse engineering implementation of https://github.com/snakers4/silero-vad
 
+仓库自带两个芯片的预编译模型：
 
-## 导出ONNX
+| 芯片 | NPU | 板子型号 | axmodel |
+|------|-----|----------|---------|
+| AX650 | NPU3 | AX650N | `src/silero_vad_axera/data/silero_vad_ax650.axmodel` |
+| AX620E | NPU2 | AX630C | `src/silero_vad_axera/data/silero_vad_ax630c.axmodel` |
+
+## 从零复现（x86 上导出 + 编译）
+
+### 1. 准备环境并导出 ONNX
+
+```bash
+pip install -r model_convert/requirements.txt
 ```
+
+下载官方 JIT 模型到 `model_convert/silero_vad.jit`：
+
+```bash
+git clone --depth 1 https://github.com/snakers4/silero-vad.git /tmp/silero-vad
+cp /tmp/silero-vad/src/silero_vad/data/silero_vad.jit model_convert/
+```
+
+导出 `silero_vad.onnx`：
+
+```bash
+cd model_convert
 python export_onnx.py
 ```
-生成silero_vad.onnx
 
+### 2. 生成校准数据
 
-## 示例
-
-### backend
-
-如要使用ax后端，先安装pyaxengine:
+```bash
+python generate_data.py
 ```
+
+读取 `wavlist.txt` 中的 wav（默认 `../en.wav` 与 `../tests/data/test.wav`），
+生成 `calibration_dataset/data.tar.gz` 与 `calibration_dataset/state.tar.gz`。
+
+### 3. 编译 axmodel（需要 docker + Pulsar2 镜像，默认 `pulsar2:7.0`）
+
+```bash
+./compile_axmodel.sh
+```
+
+同时生成两个芯片的 axmodel，输出到 `src/silero_vad_axera/data/`。
+本机已有 Pulsar2 可执行文件时：`PULSAR2_CMD=/opt/pulsar2/bin/pulsar2 ./compile_axmodel.sh`。
+
+## 板端运行
+
+### 安装
+
+如要使用 ax 后端，先安装 pyaxengine：
+
+```bash
 pip install https://github.com/AXERA-TECH/pyaxengine/releases/download/0.1.3.rc2/axengine-0.1.3-py3-none-any.whl
+pip install -e .
 ```
 
-```
-python example.py
-```
-读取en.wav，生成only_speech.wav，only_speech.wav仅包含en.wav中有说话的部分
+> AX620E/AX630C 板端需已安装 NPU 运行库 `libax_engine.so`（官方固件自带；
+> 若缺失，从对应 BSP SDK 把 `libax_engine.so` / `libax_sys.so` / `libax_interpreter.so`
+> 放到 `/usr/local/lib`（或 `/soc/lib`）并执行 `ldconfig`）。
 
+### 示例
 
-## 上传到PyPI
-
+```bash
+python example.py --backend ax650    # AX650 板
+python example.py --backend ax630c   # AX620E/AX630C 板
 ```
+
+读取 `en.wav`，生成 `only_speech.wav`，`only_speech.wav` 仅包含 `en.wav` 中有说话的部分。
+
+## 测试
+
+```bash
+pip install -e .[test]
+pytest tests/
+```
+
+## 上传到 PyPI
+
+```bash
 python -m build --sdist --wheel
 python -m twine upload dist/*
 ```
