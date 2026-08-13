@@ -1,7 +1,7 @@
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--backend", type=str, default="ax650", choices=['ax650', 'ax630c', 'onnx'])
+parser.add_argument("--backend", type=str, default="ax650", choices=['ax650', 'ax630c'])
 args = parser.parse_args()
 
 from silero_vad_axera import *

@@ -11,6 +11,9 @@ Thanks to https://github.com/lovemefan/Silero-vad-pytorch/tree/main, a reverse e
 | AX650 | NPU3 | AX650N | `src/silero_vad_axera/data/silero_vad_ax650.axmodel` |
 | AX620E | NPU2 | AX630C | `src/silero_vad_axera/data/silero_vad_ax630c.axmodel` |
 
+本仓库只支持 **axmodel（NPU）推理**，不提供 onnxruntime/CPU 后端；
+ONNX 仅作为编译 axmodel 的中间产物（见「从零复现」）。
+
 推理封装与后处理与官方 [snakers4/silero-vad](https://github.com/snakers4/silero-vad)
 （master）对齐：`model(chunk, sampling_rate)` 调用约定、`get_speech_timestamps`
 （含 `time_resolution` / `use_max_poss_sil_at_max_speech` 等新参数）、
@@ -88,6 +91,8 @@ python example.py --backend ax630c   # AX620E/AX630C 板
 pip install -e .[test]
 pytest tests/
 ```
+
+测试不依赖 NPU：验证 axmodel 数据完整性 + 后处理逻辑（用假模型模拟概率输出）。
 
 ## 上传到 PyPI
 
