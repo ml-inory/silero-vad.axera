@@ -84,9 +84,13 @@ pip install https://github.com/ml-inory/silero-vad.axera/releases/download/v0.1.
 ```
 
 > 关于 PyPI：PyPI 上已存在旧版 `silero-vad-axera 0.1.1`（不含本仓库的修复）；
-> 因 `axengine` 只发布在 GitHub（不在 PyPI），且 PyPI 禁止依赖中的直链 URL，
-> 目前无法发布到 PyPI 后一条 `pip install silero-vad-axera` 装出可运行版本，
-> 请以上述 GitHub 安装方式为准。
+> 修复后的版本已发布到 PyPI（`silero-vad-axera 0.1.2`）：
+> ```bash
+> pip install silero-vad-axera==0.1.2
+> ```
+> 因 PyPI 禁止依赖中的直链 URL，而 `axengine` 只发布在 GitHub（不在 PyPI），
+> PyPI 版不含 axengine 依赖，装完需按上文手动安装 axengine wheel；
+> GitHub 安装方式则一条命令装全（推荐）。
 
 > AX620E/AX630C 板端需已安装 NPU 运行库 `libax_engine.so`（官方固件自带；
 > 若缺失，从对应 BSP SDK 把 `libax_engine.so` / `libax_sys.so` / `libax_interpreter.so`

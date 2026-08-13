@@ -13,7 +13,7 @@ include_package_data = true
 
 [project]
 name = "silero-vad-axera"
-version = "0.1.1"
+version = "0.1.2"
 authors = [
   {name="Axera Team", email="hello@axera-tech.com"},
 ]
