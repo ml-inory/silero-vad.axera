@@ -65,12 +65,13 @@ python generate_data.py
 
 ### 安装
 
-如要使用 ax 后端，先安装 pyaxengine：
-
 ```bash
-pip install https://github.com/AXERA-TECH/pyaxengine/releases/download/0.1.3.rc2/axengine-0.1.3-py3-none-any.whl
 pip install -e .
 ```
+
+`pip install -e .` 会自动安装 pyaxengine（axengine，来自官方 GitHub release：
+`https://github.com/AXERA-TECH/pyaxengine/releases/download/0.1.3.rc2/axengine-0.1.3-py3-none-any.whl`）。
+若板端无法直连 GitHub，可先在 x86 上下载该 wheel 后手动 `pip install axengine-0.1.3-py3-none-any.whl`。
 
 > AX620E/AX630C 板端需已安装 NPU 运行库 `libax_engine.so`（官方固件自带；
 > 若缺失，从对应 BSP SDK 把 `libax_engine.so` / `libax_sys.so` / `libax_interpreter.so`
