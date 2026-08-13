@@ -55,7 +55,7 @@ for i in range(0, len(wav), window_size_samples):
     chunk = wav[i: i+window_size_samples]
     if len(chunk) < window_size_samples:
         break
-    speech_prob = model(chunk).item()
+    speech_prob = model(chunk, SAMPLING_RATE).item()
     speech_probs.append(speech_prob)
 model.reset_states() # reset model states after each audio
 

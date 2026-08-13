@@ -1,8 +1,22 @@
-import numpy as np
-import librosa
-import soundfile as sf
-from typing import Callable, List
+# -*- coding: utf-8 -*-
+"""VAD 后处理工具，与 snakers4/silero-vad（master）的 utils_vad.py 对齐。
+
+本文件是官方实现（torch/torchaudio）的 numpy 移植版：
+- get_speech_timestamps / VADIterator / collect_chunks / drop_chunks 的参数、
+  默认值与核心逻辑逐行对齐官方 master（含 time_resolution、
+  use_max_poss_sil_at_max_speech、possible_ends 等新逻辑）；
+- 读/写音频保留轻量依赖（librosa + soundfile），不引入 torch/torchaudio。
+
+模型调用约定与原版一致：``model(chunk, sampling_rate)`` 返回概率（1x1）。
+"""
 import warnings
+from typing import Callable, List
+
+import librosa
+import numpy as np
+import soundfile as sf
+
+languages = ['ru', 'en', 'de', 'es']
 
 
 def read_audio(path: str,
@@ -14,7 +28,24 @@ def read_audio(path: str,
 def save_audio(path: str,
                tensor,
                sampling_rate: int = 16000):
+    tensor = np.asarray(tensor)
+    if tensor.ndim > 1:
+        tensor = tensor[0] if tensor.shape[0] == 1 else tensor.mean(axis=0)
     sf.write(path, tensor, sampling_rate)
+
+
+def make_visualization(probs, step):
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        warnings.warn('visualize_probs=True 需要 matplotlib，已跳过绘图')
+        return
+    plt.plot([x * step for x in range(len(probs))], probs)
+    plt.ylim([0, 1.05])
+    plt.xlim([0, len(probs) * step])
+    plt.xlabel('seconds')
+    plt.ylabel('speech probability')
+    plt.show()
 
 
 def get_speech_timestamps(audio,
@@ -26,65 +57,33 @@ def get_speech_timestamps(audio,
                           min_silence_duration_ms: int = 100,
                           speech_pad_ms: int = 30,
                           return_seconds: bool = False,
+                          time_resolution: int = 1,
+                          visualize_probs: bool = False,
                           progress_tracking_callback: Callable[[float], None] = None,
                           neg_threshold: float = None,
-                          window_size_samples: int = 512,):
+                          window_size_samples: int = 512,
+                          min_silence_at_max_speech: int = 98,
+                          use_max_poss_sil_at_max_speech: bool = True):
 
     """
-    This method is used for splitting long audios into speech chunks using silero VAD
-
-    Parameters
-    ----------
-    audio: torch.Tensor, one dimensional
-        One dimensional float torch.Tensor, other types are casted to torch if possible
-
-    model: preloaded .jit/.onnx silero VAD model
-
-    threshold: float (default - 0.5)
-        Speech threshold. Silero VAD outputs speech probabilities for each audio chunk, probabilities ABOVE this value are considered as SPEECH.
-        It is better to tune this parameter for each dataset separately, but "lazy" 0.5 is pretty good for most datasets.
-
-    sampling_rate: int (default - 16000)
-        Currently silero VAD models support 8000 and 16000 (or multiply of 16000) sample rates
-
-    min_speech_duration_ms: int (default - 250 milliseconds)
-        Final speech chunks shorter min_speech_duration_ms are thrown out
-
-    max_speech_duration_s: int (default -  inf)
-        Maximum duration of speech chunks in seconds
-        Chunks longer than max_speech_duration_s will be split at the timestamp of the last silence that lasts more than 100ms (if any), to prevent agressive cutting.
-        Otherwise, they will be split aggressively just before max_speech_duration_s.
-
-    min_silence_duration_ms: int (default - 100 milliseconds)
-        In the end of each speech chunk wait for min_silence_duration_ms before separating it
-
-    speech_pad_ms: int (default - 30 milliseconds)
-        Final speech chunks are padded by speech_pad_ms each side
-
-    return_seconds: bool (default - False)
-        whether return timestamps in seconds (default - samples)
-
-    visualize_probs: bool (default - False)
-        whether draw prob hist or not
-
-    progress_tracking_callback: Callable[[float], None] (default - None)
-        callback function taking progress in percents as an argument
-
-    neg_threshold: float (default = threshold - 0.15)
-        Negative threshold (noise or exit threshold). If model's current state is SPEECH, values BELOW this value are considered as NON-SPEECH.
-
-    window_size_samples: int (default - 512 samples)
-        !!! DEPRECATED, DOES NOTHING !!!
-
-    Returns
-    ----------
-    speeches: list of dicts
-        list containing ends and beginnings of speech chunks (samples or seconds based on return_seconds)
+    与官方 silero-vad 一致：将长音频按 32ms(16k) 分块推理，
+    通过状态机切分语音区间。返回值：list[dict]，'start'/'end' 为样本点
+    （return_seconds=True 时为秒）。
     """
+    if not isinstance(audio, np.ndarray):
+        try:
+            audio = np.asarray(audio, dtype=np.float32)
+        except Exception:
+            raise TypeError("Audio cannot be casted to numpy array. Cast it manually")
 
     if len(audio.shape) > 1:
         for i in range(len(audio.shape)):  # trying to squeeze empty dimensions
-            audio = audio[0]
+            if audio.shape[0] == 1:
+                audio = audio[0]
+            else:
+                break
+        if len(audio.shape) > 1:
+            raise ValueError("More than one dimension in audio. Are you trying to process audio with 2 channels?")
 
     if sampling_rate > 16000 and (sampling_rate % 16000 == 0):
         step = sampling_rate // 16000
@@ -104,7 +103,7 @@ def get_speech_timestamps(audio,
     speech_pad_samples = sampling_rate * speech_pad_ms / 1000
     max_speech_samples = sampling_rate * max_speech_duration_s - window_size_samples - 2 * speech_pad_samples
     min_silence_samples = sampling_rate * min_silence_duration_ms / 1000
-    min_silence_samples_at_max_speech = sampling_rate * 98 / 1000
+    min_silence_samples_at_max_speech = sampling_rate * min_silence_at_max_speech / 1000
 
     audio_length_samples = len(audio)
 
@@ -113,9 +112,9 @@ def get_speech_timestamps(audio,
         chunk = audio[current_start_sample: current_start_sample + window_size_samples]
         if len(chunk) < window_size_samples:
             chunk = np.pad(chunk, (0, int(window_size_samples - len(chunk))))
-        speech_prob = model(chunk)
+        speech_prob = model(chunk, sampling_rate).item()
         speech_probs.append(speech_prob)
-        # caculate progress and seng it to callback function
+        # calculate progress and send it to callback function
         progress = current_start_sample + window_size_samples
         if progress > audio_length_samples:
             progress = audio_length_samples
@@ -131,42 +130,73 @@ def get_speech_timestamps(audio,
         neg_threshold = max(threshold - 0.15, 0.01)
     temp_end = 0  # to save potential segment end (and tolerate some silence)
     prev_end = next_start = 0  # to save potential segment limits in case of maximum segment size reached
+    possible_ends = []
 
     for i, speech_prob in enumerate(speech_probs):
+        cur_sample = window_size_samples * i
+
+        # If speech returns after a temp_end, record candidate silence if long enough and clear temp_end
         if (speech_prob >= threshold) and temp_end:
+            sil_dur = cur_sample - temp_end
+            if sil_dur > min_silence_samples_at_max_speech:
+                possible_ends.append((temp_end, sil_dur))
             temp_end = 0
             if next_start < prev_end:
-                next_start = window_size_samples * i
+                next_start = cur_sample
 
+        # Start of speech
         if (speech_prob >= threshold) and not triggered:
             triggered = True
-            current_speech['start'] = window_size_samples * i
+            current_speech['start'] = cur_sample
             continue
 
-        if triggered and (window_size_samples * i) - current_speech['start'] > max_speech_samples:
-            if prev_end:
+        # Max speech length reached: decide where to cut
+        if triggered and (cur_sample - current_speech['start'] > max_speech_samples):
+            if use_max_poss_sil_at_max_speech and possible_ends:
+                prev_end, dur = max(possible_ends, key=lambda x: x[1])  # use the longest possible silence segment in the current speech chunk
                 current_speech['end'] = prev_end
                 speeches.append(current_speech)
                 current_speech = {}
-                if next_start < prev_end:  # previously reached silence (< neg_thres) and is still not speech (< thres)
-                    triggered = False
-                else:
-                    current_speech['start'] = next_start
-                prev_end = next_start = temp_end = 0
-            else:
-                current_speech['end'] = window_size_samples * i
-                speeches.append(current_speech)
-                current_speech = {}
-                prev_end = next_start = temp_end = 0
-                triggered = False
-                continue
+                next_start = prev_end + dur
 
+                if next_start < prev_end + cur_sample:  # previously reached silence (< neg_thres) and is still not speech (< thres)
+                    current_speech['start'] = next_start
+                else:
+                    triggered = False
+                prev_end = next_start = temp_end = 0
+                possible_ends = []
+            else:
+                # Legacy max-speech cut (use_max_poss_sil_at_max_speech=False): prefer last valid silence (prev_end) if available
+                if prev_end:
+                    current_speech['end'] = prev_end
+                    speeches.append(current_speech)
+                    current_speech = {}
+                    if next_start < prev_end:
+                        triggered = False
+                    else:
+                        current_speech['start'] = next_start
+                    prev_end = next_start = temp_end = 0
+                    possible_ends = []
+                else:
+                    # No prev_end -> fallback to cutting at current sample
+                    current_speech['end'] = cur_sample
+                    speeches.append(current_speech)
+                    current_speech = {}
+                    prev_end = next_start = temp_end = 0
+                    triggered = False
+                    possible_ends = []
+                    continue
+
+        # Silence detection while in speech
         if (speech_prob < neg_threshold) and triggered:
             if not temp_end:
-                temp_end = window_size_samples * i
-            if ((window_size_samples * i) - temp_end) > min_silence_samples_at_max_speech:  # condition to avoid cutting in very short silence
+                temp_end = cur_sample
+            sil_dur_now = cur_sample - temp_end
+
+            if not use_max_poss_sil_at_max_speech and sil_dur_now > min_silence_samples_at_max_speech:  # condition to avoid cutting in very short silence
                 prev_end = temp_end
-            if (window_size_samples * i) - temp_end < min_silence_samples:
+
+            if sil_dur_now < min_silence_samples:
                 continue
             else:
                 current_speech['end'] = temp_end
@@ -175,6 +205,7 @@ def get_speech_timestamps(audio,
                 current_speech = {}
                 prev_end = next_start = temp_end = 0
                 triggered = False
+                possible_ends = []
                 continue
 
     if current_speech and (audio_length_samples - current_speech['start']) > min_speech_samples:
@@ -198,12 +229,15 @@ def get_speech_timestamps(audio,
     if return_seconds:
         audio_length_seconds = audio_length_samples / sampling_rate
         for speech_dict in speeches:
-            speech_dict['start'] = max(round(speech_dict['start'] / sampling_rate, 1), 0)
-            speech_dict['end'] = min(round(speech_dict['end'] / sampling_rate, 1), audio_length_seconds)
+            speech_dict['start'] = max(round(speech_dict['start'] / sampling_rate, time_resolution), 0)
+            speech_dict['end'] = min(round(speech_dict['end'] / sampling_rate, time_resolution), audio_length_seconds)
     elif step > 1:
         for speech_dict in speeches:
             speech_dict['start'] *= step
             speech_dict['end'] *= step
+
+    if visualize_probs:
+        make_visualization(speech_probs, window_size_samples / sampling_rate)
 
     return speeches
 
@@ -217,26 +251,7 @@ class VADIterator:
                  speech_pad_ms: int = 30
                  ):
 
-        """
-        Class for stream imitation
-
-        Parameters
-        ----------
-        model: preloaded .jit/.onnx silero VAD model
-
-        threshold: float (default - 0.5)
-            Speech threshold. Silero VAD outputs speech probabilities for each audio chunk, probabilities ABOVE this value are considered as SPEECH.
-            It is better to tune this parameter for each dataset separately, but "lazy" 0.5 is pretty good for most datasets.
-
-        sampling_rate: int (default - 16000)
-            Currently silero VAD models support 8000 and 16000 sample rates
-
-        min_silence_duration_ms: int (default - 100 milliseconds)
-            In the end of each speech chunk wait for min_silence_duration_ms before separating it
-
-        speech_pad_ms: int (default - 30 milliseconds)
-            Final speech chunks are padded by speech_pad_ms each side
-        """
+        """流式 VAD：逐 chunk 调用，返回 {'start': ...} / {'end': ...} / None。"""
 
         self.model = model
         self.threshold = threshold
@@ -250,25 +265,24 @@ class VADIterator:
         self.reset_states()
 
     def reset_states(self):
-
         self.model.reset_states()
         self.triggered = False
         self.temp_end = 0
         self.current_sample = 0
 
-    def __call__(self, x, return_seconds=False):
-        """
-        x: torch.Tensor
-            audio chunk (see examples in repo)
+    def __call__(self, x, return_seconds=False, time_resolution: int = 1):
+        """x: 音频 chunk（1D 或 2D (1, n)）"""
 
-        return_seconds: bool (default - False)
-            whether return timestamps in seconds (default - samples)
-        """
+        if not isinstance(x, np.ndarray):
+            try:
+                x = np.asarray(x, dtype=np.float32)
+            except Exception:
+                raise TypeError("Audio cannot be casted to numpy array. Cast it manually")
 
         window_size_samples = len(x[0]) if x.ndim == 2 else len(x)
         self.current_sample += window_size_samples
 
-        speech_prob = self.model(x)
+        speech_prob = self.model(x, self.sampling_rate).item()
 
         if (speech_prob >= self.threshold) and self.temp_end:
             self.temp_end = 0
@@ -276,7 +290,7 @@ class VADIterator:
         if (speech_prob >= self.threshold) and not self.triggered:
             self.triggered = True
             speech_start = max(0, self.current_sample - self.speech_pad_samples - window_size_samples)
-            return {'start': int(speech_start) if not return_seconds else round(speech_start / self.sampling_rate, 1)}
+            return {'start': int(speech_start) if not return_seconds else round(speech_start / self.sampling_rate, time_resolution)}
 
         if (speech_prob < self.threshold - 0.15) and self.triggered:
             if not self.temp_end:
@@ -287,24 +301,53 @@ class VADIterator:
                 speech_end = self.temp_end + self.speech_pad_samples - window_size_samples
                 self.temp_end = 0
                 self.triggered = False
-                return {'end': int(speech_end) if not return_seconds else round(speech_end / self.sampling_rate, 1)}
+                return {'end': int(speech_end) if not return_seconds else round(speech_end / self.sampling_rate, time_resolution)}
 
         return None
 
 
 def collect_chunks(tss: List[dict],
-                   wav: np.array):
-    chunks = []
-    for i in tss:
-        chunks.append(wav[i['start']: i['end']])
-    return np.concatenate(chunks, axis=-1)
+                   wav: np.ndarray,
+                   seconds: bool = False,
+                   sampling_rate: int = None) -> np.ndarray:
+    """按坐标列表从长音频中拼接语音片段（坐标可为样本点或秒）。"""
+    if seconds and not sampling_rate:
+        raise ValueError('sampling_rate must be provided when seconds is True')
+
+    chunks = list()
+    _tss = _seconds_to_samples_tss(tss, sampling_rate) if seconds else tss
+
+    for i in _tss:
+        chunks.append(wav[i['start']:i['end']])
+
+    return np.concatenate(chunks)
 
 
 def drop_chunks(tss: List[dict],
-                wav: np.array):
-    chunks = []
+                wav: np.ndarray,
+                seconds: bool = False,
+                sampling_rate: int = None) -> np.ndarray:
+    """按坐标列表从长音频中删除语音片段（坐标可为样本点或秒）。"""
+    if seconds and not sampling_rate:
+        raise ValueError('sampling_rate must be provided when seconds is True')
+
+    chunks = list()
     cur_start = 0
-    for i in tss:
+
+    _tss = _seconds_to_samples_tss(tss, sampling_rate) if seconds else tss
+
+    for i in _tss:
         chunks.append((wav[cur_start: i['start']]))
         cur_start = i['end']
-    return np.concatenate(chunks, axis=-1)
+
+    chunks.append(wav[cur_start:])
+
+    return np.concatenate(chunks)
+
+
+def _seconds_to_samples_tss(tss: List[dict], sampling_rate: int) -> List[dict]:
+    """把秒坐标转成样本坐标。"""
+    return [{
+        'start': round(crd['start'] * sampling_rate),
+        'end': round(crd['end'] * sampling_rate)
+    } for crd in tss]

@@ -11,6 +11,13 @@ Thanks to https://github.com/lovemefan/Silero-vad-pytorch/tree/main, a reverse e
 | AX650 | NPU3 | AX650N | `src/silero_vad_axera/data/silero_vad_ax650.axmodel` |
 | AX620E | NPU2 | AX630C | `src/silero_vad_axera/data/silero_vad_ax630c.axmodel` |
 
+推理封装与后处理与官方 [snakers4/silero-vad](https://github.com/snakers4/silero-vad)
+（master）对齐：`model(chunk, sampling_rate)` 调用约定、`get_speech_timestamps`
+（含 `time_resolution` / `use_max_poss_sil_at_max_speech` 等新参数）、
+`VADIterator`、`collect_chunks` / `drop_chunks`（支持秒坐标）。
+注意：编译出的 axmodel 是 16k 静态图，仅支持 `sampling_rate=16000`
+（或其整数倍，会自动降采样），不支持 8000。
+
 ## 从零复现（x86 上导出 + 编译）
 
 ### 1. 准备环境并导出 ONNX
