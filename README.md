@@ -110,12 +110,10 @@ python example.py --backend ax630c   # AX620E/AX630C 板
 `cpp/` 提供直接链接 AX Engine runtime 的 C++ SDK（源码在 GitHub，预编译产物放 HF）：
 
 ```bash
-cmake -S cpp -B cpp/build-aarch64 \
-  -DCMAKE_TOOLCHAIN_FILE=cpp/toolchain-aarch64.cmake \
-  -DTOOLCHAIN_ROOT=/path/to/aarch64-none-linux-gnu
-cmake --build cpp/build-aarch64 -j
+bash cpp/scripts/build.sh   # 自动下载 BSP 工具链 + 一键交叉编译
 ```
 
+产物：`cpp/build-aarch64/silero_vad_example`。
 详细用法见 [cpp/README.md](cpp/README.md)。
 
 ## 测试

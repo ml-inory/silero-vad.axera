@@ -12,8 +12,26 @@ Silero VAD 流式推理 SDK，行为与 Python SDK 对齐：
 
 ## 交叉编译（aarch64）
 
-依赖：`aarch64-none-linux-gnu-gcc/g++`（GCC 9.2）与 AX runtime 头文件/库。
-本目录 `axrt/` 已预置 AX650C runtime（include + libax_engine/libax_sys/
+### 一键编译（推荐）
+
+```bash
+bash cpp/scripts/build.sh
+```
+
+工具链（Arm GNU AArch64 GCC 9.2）缺失时会自动下载到 `cpp/third_party/`，
+随后自动 cmake 配置并编译，产物为 `cpp/build-aarch64/silero_vad_example`。
+国内网络下载官方源较慢时，可指定镜像：
+
+```bash
+TOOLCHAIN_URL=https://你的镜像/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz \
+  bash cpp/scripts/build.sh
+```
+
+### 手动交叉编译
+
+依赖：`aarch64-none-linux-gnu-gcc/g++`（GCC 9.2，可先运行
+`bash cpp/scripts/download_bsp.sh`）与 AX runtime 头文件/库。
+本目录 `axrt/` 已预置 AX runtime（include + libax_engine/libax_sys/
 libax_interpreter），可直接编译；也可用你自己的 BSP 覆盖：
 
 ```bash
