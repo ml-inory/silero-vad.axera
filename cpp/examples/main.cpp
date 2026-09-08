@@ -66,13 +66,12 @@ int main(int argc, char** argv) {
 
         for (size_t i = 0; i < probs.size(); ++i) {
             const float p = probs[i];
+            if (p >= kThreshold) ++speech_frames;
             if (p >= kThreshold && temp_end >= 0) temp_end = -1;
             if (p >= kThreshold && !triggered) {
                 triggered = true;
                 seg_start = static_cast<int>(i);
-                speech_frames = 0;
             }
-            if (triggered && p >= kThreshold) ++speech_frames;
             if (triggered && p < kNegThreshold) {
                 if (temp_end < 0) temp_end = static_cast<int>(i);
                 if (static_cast<int>(i) - temp_end >= kMinSilenceFrames - 1) {
