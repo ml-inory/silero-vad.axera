@@ -7,6 +7,7 @@ build/
 *.egg-info/
 model_convert/work_*/
 model_convert/*_pulsar2_config.json
+cpp/build*/
 
 /model_convert/silero_vad.onnx
 model_convert/*.onnx.data

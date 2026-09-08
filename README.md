@@ -105,6 +105,19 @@ python example.py --backend ax630c   # AX620E/AX630C 板
 
 读取 `en.wav`，生成 `only_speech.wav`，`only_speech.wav` 仅包含 `en.wav` 中有说话的部分。
 
+### C++ SDK
+
+`cpp/` 提供直接链接 AX Engine runtime 的 C++ SDK（源码在 GitHub，预编译产物放 HF）：
+
+```bash
+cmake -S cpp -B cpp/build-aarch64 \
+  -DCMAKE_TOOLCHAIN_FILE=cpp/toolchain-aarch64.cmake \
+  -DTOOLCHAIN_ROOT=/path/to/aarch64-none-linux-gnu
+cmake --build cpp/build-aarch64 -j
+```
+
+详细用法见 [cpp/README.md](cpp/README.md)。
+
 ## 测试
 
 ```bash
